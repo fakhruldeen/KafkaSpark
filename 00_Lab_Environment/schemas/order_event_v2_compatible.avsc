@@ -1,0 +1,16 @@
+{
+  "type": "record",
+  "name": "OrderEvent",
+  "namespace": "nile.retail.orders",
+  "doc": "Version 2: adds an optional channel. Backward compatible with v1.",
+  "fields": [
+    {"name": "event_id", "type": "string"},
+    {"name": "order_id", "type": "string"},
+    {"name": "customer_id", "type": "string"},
+    {"name": "store_id", "type": "string"},
+    {"name": "event_type", "type": "string"},
+    {"name": "amount", "type": ["null", "double"], "default": null},
+    {"name": "event_time", "type": "string"},
+    {"name": "channel", "type": ["null", "string"], "default": null}
+  ]
+}

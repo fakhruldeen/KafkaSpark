@@ -1,0 +1,36 @@
+{
+  "type": "record",
+  "name": "OrderEvent",
+  "namespace": "nile.retail.orders",
+  "doc": "Version 3 (breaking): renames amount to total and drops the default. Old data has no total, so readers fail.",
+  "fields": [
+    {
+      "name": "event_id",
+      "type": "string"
+    },
+    {
+      "name": "order_id",
+      "type": "string"
+    },
+    {
+      "name": "customer_id",
+      "type": "string"
+    },
+    {
+      "name": "store_id",
+      "type": "string"
+    },
+    {
+      "name": "event_type",
+      "type": "string"
+    },
+    {
+      "name": "total",
+      "type": "double"
+    },
+    {
+      "name": "event_time",
+      "type": "string"
+    }
+  ]
+}

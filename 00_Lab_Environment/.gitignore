@@ -1,0 +1,7 @@
+# Never commit these: secrets, checkpoints and generated output (Module 4, T6 hygiene gate)
+.env
+data/checkpoints/
+data/s*_*.txt
+__pycache__/
+.pytest_cache/
+*.pyc

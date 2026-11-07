@@ -1,0 +1,26 @@
+# Python artifacts
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+*.egg-info/
+
+# Lab data & state
+00_Lab_Environment/data/checkpoints/*
+!00_Lab_Environment/data/checkpoints/.gitkeep
+00_Lab_Environment/data/curated/*
+!00_Lab_Environment/data/curated/.gitkeep
+00_Lab_Environment/data/s*_*.txt
+00_Lab_Environment/.env
+
+# Downloaded JARs (downloaded on demand via download_dependencies.sh)
+00_Lab_Environment/jars/*.jar
+!00_Lab_Environment/jars/.gitkeep
+
+# IDE & OS
+.DS_Store
+.idea/
+.vscode/
+*.swp

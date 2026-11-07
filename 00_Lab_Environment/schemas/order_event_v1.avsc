@@ -1,0 +1,15 @@
+{
+  "type": "record",
+  "name": "OrderEvent",
+  "namespace": "nile.retail.orders",
+  "doc": "One order event. Version 1 of the contract.",
+  "fields": [
+    {"name": "event_id", "type": "string"},
+    {"name": "order_id", "type": "string"},
+    {"name": "customer_id", "type": "string"},
+    {"name": "store_id", "type": "string"},
+    {"name": "event_type", "type": "string"},
+    {"name": "amount", "type": ["null", "double"], "default": null},
+    {"name": "event_time", "type": "string", "doc": "ISO-8601 UTC timestamp"}
+  ]
+}

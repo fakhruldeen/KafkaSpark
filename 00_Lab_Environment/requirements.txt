@@ -1,0 +1,4 @@
+# Python packages for all labs. Pin exact versions at freeze (Lab 00, step 3).
+confluent-kafka[avro]>=2.4,<3
+pyspark==3.5.9
+pytest>=8,<9
