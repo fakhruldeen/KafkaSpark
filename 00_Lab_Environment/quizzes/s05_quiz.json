@@ -1,0 +1,207 @@
+{
+  "session": "s05",
+  "title": "S05 Knowledge Gate: Confluent Schema Registry & Data Contracts",
+  "description": "Pre-Lab Conceptual Readiness Check for Schema Registry, Avro Wire Format, Magic Byte, Compatibility Modes, and Schema Evolution.",
+  "questions": [
+    {
+      "id": 1,
+      "type": "single",
+      "question": "What is the Confluent Schema Registry Wire Format prepended to every serialized Avro payload in Kafka?",
+      "options": {
+        "A": "A 100-character random UUID string.",
+        "B": "1 Magic Byte (`0x00`) followed by a 4-byte Big-Endian integer representing the Schema ID registered in Schema Registry.",
+        "C": "The full JSON text of the Avro schema definition repeated in every message.",
+        "D": "The sender's IP address and MAC address."
+      },
+      "correct": ["B"],
+      "diagnostic_hint": "How many bytes are added to the beginning of the binary payload: 1 magic byte plus how many bytes for the schema integer ID?",
+      "explanation": "Confluent SerDe prefixes exactly 5 bytes to each payload: Byte 0 is the Magic Byte (`0x00`), and Bytes 1-4 encode the 32-bit Schema ID in big-endian network byte order. This allows consumers to extract the ID, fetch/cache the schema once, and deserialize payloads without embedding bulky schema definitions in every record.",
+      "option_explanations": {
+        "A": "Incorrect; Kafka wire format does not use string UUID prefixes.",
+        "B": "Correct! Exactly 5 bytes (1 byte magic + 4 bytes schema ID) achieves 80%+ bandwidth efficiency over JSON.",
+        "C": "Incorrect; embedding the full schema in every message is an anti-pattern that Schema Registry was specifically built to eliminate.",
+        "D": "Incorrect; network metadata belongs to TCP/IP headers, not message bodies."
+      }
+    },
+    {
+      "id": 2,
+      "type": "single",
+      "question": "Under `BACKWARD` compatibility mode (the default), what does the compatibility rule mandate?",
+      "options": {
+        "A": "New schemas can only be written by legacy producers.",
+        "B": "Consumers using the NEW schema must be able to process events produced with the OLD schema (previous version).",
+        "C": "Consumers using the old schema must be able to process new schema events.",
+        "D": "All topic data must be deleted before registering a new schema."
+      },
+      "correct": ["B"],
+      "diagnostic_hint": "Think of rollout order: if you upgrade consumers first, which schema version are consumers using, and which data are they reading?",
+      "explanation": "`BACKWARD` compatibility means consumers upgraded to Schema V(new) can deserialize data produced with Schema V(old). This allows upgrading consumers first before upgrading producers. Rules: (1) Fields can be deleted. (2) New fields MUST have a default value defined.",
+      "option_explanations": {
+        "A": "Nonsense distractor.",
+        "B": "Correct! New consumer code successfully reads old historical event data.",
+        "C": "Incorrect; that is the definition of `FORWARD` compatibility (upgrade producers first).",
+        "D": "Completely false; schema evolution preserves historical log data."
+      }
+    },
+    {
+      "id": 3,
+      "type": "multiple",
+      "question": "What happens if a developer attempts to register an INCOMPATIBLE schema version against a subject in Confluent Schema Registry? (Select ALL that apply)",
+      "options": {
+        "A": "Schema Registry rejects the registration and returns an `HTTP 409 Conflict` status code.",
+        "B": "The broker cluster crashes immediately.",
+        "C": "The producer attempting to register the breaking schema throws a `SchemaRegistryException` (or `IncompatibleSchemaException`).",
+        "D": "Kafka formats the disk containing that topic."
+      },
+      "correct": ["A", "C"],
+      "diagnostic_hint": "What HTTP error code indicates schema compatibility failure? Does the broker crash?",
+      "explanation": "Schema Registry enforces data contracts at registration time. An incompatible schema is rejected with `HTTP 409 Conflict` (A), causing client SerDes to raise an exception (C). The Kafka broker cluster is completely unaffected (B), and no data is deleted (D).",
+      "option_explanations": {
+        "A": "True: Standard REST API rejection code for compatibility violations.",
+        "B": "False: Schema Registry is an external service; brokers are not impacted.",
+        "C": "True: Fail-fast exception in client application before sending invalid bytes.",
+        "D": "False: Topics and logs remain completely intact."
+      }
+    },
+    {
+      "id": 4,
+      "type": "single",
+      "question": "What is the consequence of adding a new field to an Apache Avro schema WITHOUT providing a `\"default\"` attribute in `BACKWARD` compatibility mode?",
+      "options": {
+        "A": "The schema compiles faster.",
+        "B": "The new schema is rejected as incompatible because consumers using the new schema cannot deserialize older messages where that field does not exist.",
+        "C": "The field is automatically filled with random numbers.",
+        "D": "Avro converts all fields to string format."
+      },
+      "correct": ["B"],
+      "diagnostic_hint": "If an old message does not contain the new field, how can a new consumer construct the object without a fallback default value?",
+      "explanation": "In `BACKWARD` compatibility, if a new consumer reads an old message, it looks for the new field in the payload. Since old records do not contain it, deserialization will fail unless the schema defines a `default` value (e.g. `\"default\": null` or `\"default\": \"standard\"`). Omitting the default causes Schema Registry to reject the evolution.",
+      "option_explanations": {
+        "A": "False: Schema validation is enforced, not bypassed.",
+        "B": "Correct! Default values are mandatory for backward-compatible field additions.",
+        "C": "False: Deserializers require deterministic types and values.",
+        "D": "False: Type definitions remain strict."
+      }
+    },
+    {
+      "id": 5,
+      "type": "multiple",
+      "question": "Which of the following serialization formats are natively supported by modern Confluent Schema Registry? (Select ALL that apply)",
+      "options": {
+        "A": "Apache Avro (`.avsc`)",
+        "B": "Protocol Buffers / Protobuf (`.proto`)",
+        "C": "JSON Schema (`.json`)",
+        "D": "Plain CSV spreadsheets"
+      },
+      "correct": ["A", "B", "C"],
+      "diagnostic_hint": "Which three structured contract formats have official Confluent SerDe libraries?",
+      "explanation": "Confluent Schema Registry natively supports three enterprise data contract formats: (A) Apache Avro, (B) Protocol Buffers (Google Protobuf), and (C) JSON Schema. Plain CSV (D) is unstructured text without formal schema compatibility semantics.",
+      "option_explanations": {
+        "A": "Supported: The foundational binary format for Big Data and Hadoop/Spark ecosystems.",
+        "B": "Supported: Google binary format widely used in gRPC microservices.",
+        "C": "Supported: Standard declarative JSON contract format.",
+        "D": "Unsupported: CSV lacks machine-enforceable contract and evolution semantics."
+      }
+    },
+    {
+      "id": 6,
+      "type": "single",
+      "question": "By default, what naming strategy does Schema Registry use to associate schemas with topics for value payloads (`TopicNameStrategy`)?",
+      "options": {
+        "A": "`<topic_name>-value`",
+        "B": "`<topic_name>-key`",
+        "C": "`<topic_name>-schema`",
+        "D": "`global-schema-registry-subject`"
+      },
+      "correct": ["A"],
+      "diagnostic_hint": "If your topic is `retail.orders`, what is the subject name registered in Schema Registry for message values?",
+      "explanation": "Under `TopicNameStrategy` (the default), message values are registered under subject `<topic>-value` (e.g. `retail.orders-value`), and keys are registered under `<topic>-key`. This isolates value and key evolution per topic.",
+      "option_explanations": {
+        "A": "Correct! The standard Confluent subject convention for record payloads.",
+        "B": "Incorrect; this is used for message keys, not values.",
+        "C": "Incorrect subject suffix.",
+        "D": "Incorrect; subjects are scoped per topic unless using `RecordNameStrategy`."
+      }
+    },
+    {
+      "id": 7,
+      "type": "multiple",
+      "question": "Under `FULL` compatibility mode, what must be true for all schema changes? (Select ALL that apply)",
+      "options": {
+        "A": "Schemas are simultaneously `BACKWARD` and `FORWARD` compatible.",
+        "B": "Old consumers can read messages written by new producers, AND new consumers can read messages written by old producers.",
+        "C": "Producers and consumers can be upgraded in ANY order (independently).",
+        "D": "All fields must be marked as deprecated."
+      },
+      "correct": ["A", "B", "C"],
+      "diagnostic_hint": "What is the advantage of combining Backward and Forward compatibility?",
+      "explanation": "`FULL` compatibility combines Backward and Forward. (A) It enforces bidirectional evolution. (B) Old and new clients can cross-communicate seamlessly. (C) It decouples team deployment schedules, allowing producers and consumers to roll out in any arbitrary order. (D) is false.",
+      "option_explanations": {
+        "A": "True: Both directional constraints are strictly enforced.",
+        "B": "True: True bidirectional interoperability across client versions.",
+        "C": "True: Independent deployment freedom across distributed engineering teams.",
+        "D": "False: Deprecation is optional documentation, not a schema rule."
+      }
+    },
+    {
+      "id": 8,
+      "type": "single",
+      "question": "Where does Confluent Schema Registry physically store registered schemas and subject version histories?",
+      "options": {
+        "A": "In an external MySQL database.",
+        "B": "In an internal, compacted Kafka topic named `_schemas` within the Kafka cluster itself.",
+        "C": "In text files on the local root filesystem.",
+        "D": "In client browser local storage."
+      },
+      "correct": ["B"],
+      "diagnostic_hint": "Does Schema Registry depend on an external relational database, or does it 'eat its own dog food' by using Kafka?",
+      "explanation": "Schema Registry is a stateless Java application that stores all schemas, subject configurations, and metadata in a special compacted Kafka topic named `_schemas`. Multiple Schema Registry instances use this topic to achieve high availability and active-standby leader election without external database dependencies.",
+      "option_explanations": {
+        "A": "False: Schema Registry does not require relational databases.",
+        "B": "Correct! The `_schemas` topic acts as a distributed, durable, replicated commit log for schema contracts.",
+        "C": "False: Ephemeral local files would break clustering and container restarts.",
+        "D": "Absurd distractor."
+      }
+    },
+    {
+      "id": 9,
+      "type": "single",
+      "question": "Why is client-side schema caching critical for Confluent Producer and Consumer performance?",
+      "options": {
+        "A": "Because Schema Registry charges per HTTP request.",
+        "B": "Because without caching, every single message serialized or deserialized would require an HTTP network round-trip to Schema Registry, dropping throughput from 100,000 msgs/sec to under 100 msgs/sec.",
+        "C": "Because Kafka brokers refuse messages without client certificates.",
+        "D": "Because Avro requires cached schemas to calculate checksums."
+      },
+      "correct": ["B"],
+      "diagnostic_hint": "What would happen to latency if every message required an HTTP REST call to port 8081?",
+      "explanation": "Client SerDes maintain an in-memory schema cache (LRU cache). On first encountering a schema, they perform an HTTP GET/POST to Schema Registry once and cache the mapping `(Schema <-> SchemaID)`. Subsequent millions of records reuse the cached schema in nanoseconds, eliminating network overhead.",
+      "option_explanations": {
+        "A": "False: Confluent Community Schema Registry is open and free to query.",
+        "B": "Correct! Eliminates per-message HTTP latency bottlenecks.",
+        "C": "False: Unrelated to TLS client certificates.",
+        "D": "False: Avro parsing relies on cached schema objects for speed, not checksums."
+      }
+    },
+    {
+      "id": 10,
+      "type": "multiple",
+      "question": "Which of the following actions constitute BREAKING CHANGES in an Avro schema under `BACKWARD` compatibility mode? (Select ALL that apply)",
+      "options": {
+        "A": "Deleting a required field that had no default value.",
+        "B": "Renaming an existing field without an alias.",
+        "C": "Changing a field type from `string` to `int`.",
+        "D": "Adding a new optional field with `\"default\": null`."
+      },
+      "correct": ["B", "C"],
+      "diagnostic_hint": "Which modifications break deserialization when an old record is read with the new schema definition?",
+      "explanation": "In `BACKWARD` compatibility: (B) Renaming a field causes the consumer to look for the new name, which is missing in old records. (C) Incompatible type change (`string` to `int`) breaks binary decoding. (A) Deleting a field is actually ALLOWED in Backward mode (the consumer simply ignores it). (D) Adding an optional field with a default is the textbook definition of a COMPATIBLE change.",
+      "option_explanations": {
+        "A": "Allowed: Deleting fields is permitted in BACKWARD mode because new consumers don't need the deleted field.",
+        "B": "Breaking: Without an alias, renaming appears as a missing field in old data.",
+        "C": "Breaking: Binary decoders cannot convert arbitrary strings to integer primitives.",
+        "D": "Compatible: Adding fields with default values is fully backward compatible."
+      }
+    }
+  ]
+}

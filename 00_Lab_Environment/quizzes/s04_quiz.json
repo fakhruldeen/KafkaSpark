@@ -1,0 +1,207 @@
+{
+  "session": "s04",
+  "title": "S04 Knowledge Gate: Kafka Consumer Internals, Rebalancing & Resiliency",
+  "description": "Pre-Lab Conceptual Readiness Check for Consumer Groups, CooperativeSticky Rebalance, Offset Commit Strategies, and Dead Letter Topics.",
+  "questions": [
+    {
+      "id": 1,
+      "type": "single",
+      "question": "What is the primary role of the Group Coordinator broker in Kafka Consumer Groups?",
+      "options": {
+        "A": "It executes MapReduce operations on consumer machines.",
+        "B": "It is the specific broker managing consumer group metadata, heartbeats, member joins/leaves, and offset commits for that group.",
+        "C": "It acts as a load balancer for external HTTP traffic.",
+        "D": "It deletes partitions when consumers lag behind."
+      },
+      "correct": ["B"],
+      "diagnostic_hint": "How does Kafka coordinate which broker consumer heartbeats go to? Which broker owns the group's `__consumer_offsets` partition?",
+      "explanation": "The Group Coordinator is the broker that hosts the leader replica of the specific `__consumer_offsets` partition assigned to the group (determined by `Math.abs(groupId.hashCode()) % numOffsetsPartitions`). It manages heartbeat monitoring, coordinates membership, and orchestrates rebalances.",
+      "option_explanations": {
+        "A": "Incorrect; Kafka consumers are client-side processes, not Hadoop MapReduce workers.",
+        "B": "Correct! Group Coordinator is the broker anchor managing group lifecycles.",
+        "C": "Incorrect; Group Coordinator handles internal Kafka protocol RPCs, not HTTP traffic.",
+        "D": "Incorrect; partition lifecycles are independent of consumer groups."
+      }
+    },
+    {
+      "id": 2,
+      "type": "single",
+      "question": "Why is the `CooperativeStickyAssignor` preferred over the legacy `RangeAssignor` in modern Kafka clusters?",
+      "options": {
+        "A": "It automatically compresses data using Snappy.",
+        "B": "It eliminates the 'Stop-the-World' downtime during rebalances by reassigning only the affected partitions incrementally, allowing unaffected consumers to continue reading without interruption.",
+        "C": "It forces all consumers to read from Partition 0 simultaneously.",
+        "D": "It deletes failed consumer processes from the operating system."
+      },
+      "correct": ["B"],
+      "diagnostic_hint": "Contrast Eager Rebalancing (everyone revokes all partitions) with Incremental Cooperative Rebalancing.",
+      "explanation": "Legacy Eager assignors (Range, RoundRobin) revoke ALL partitions from ALL consumers during any membership change, causing a complete processing freeze. The `CooperativeStickyAssignor` uses Incremental Cooperative Rebalancing: consumers keep processing unaffected partitions, revoking and migrating only the exact partitions being reassigned.",
+      "option_explanations": {
+        "A": "False: Assignors manage partition distribution, not message compression.",
+        "B": "Correct! Eliminates stop-the-world pauses and preserves processing continuity.",
+        "C": "False: Violates consumer group exclusivity rules.",
+        "D": "False: Assignors are partition assignment algorithms, not OS process killers."
+      }
+    },
+    {
+      "id": 3,
+      "type": "multiple",
+      "question": "What are the major RISKS of using automatic offset commits (`enable.auto.commit = true`) in mission-critical applications? (Select ALL that apply)",
+      "options": {
+        "A": "Data Loss: If records are fetched and auto-committed, but the consumer crashes before processing completes, those records will never be reprocessed upon restart.",
+        "B": "Data Duplication: If processing takes longer than `auto.commit.interval.ms` and a rebalance occurs before commit, records will be reprocessed by the new partition owner.",
+        "C": "The broker deletes all data in the topic immediately upon auto-commit.",
+        "D": "Inability to implement exact at-least-once or transactional processing semantics."
+      },
+      "correct": ["A", "B", "D"],
+      "diagnostic_hint": "Consider the timing disconnect between auto-commit timers and actual business logic completion.",
+      "explanation": "Automatic commits happen on a background timer decoupled from business logic execution. If a crash occurs after timer commit but before processing, data is lost (A). If a crash/rebalance occurs after processing but before timer commit, data is duplicated (B). (C) is false because committing offsets never deletes topic logs.",
+      "option_explanations": {
+        "A": "True: Premature offset advancement leads to unrecoverable data loss.",
+        "B": "True: Delayed offset advancement causes duplicate processing on failover.",
+        "C": "False: Commits simply update pointer entries in `__consumer_offsets`.",
+        "D": "True: Manual synchronous/asynchronous commits are mandatory for deterministic semantics."
+      }
+    },
+    {
+      "id": 4,
+      "type": "single",
+      "question": "What is a 'Poison Pill' in event streaming, and how does a Dead Letter Topic (DLT) resolve it?",
+      "options": {
+        "A": "A physical hardware virus on the broker motherboard.",
+        "B": "A corrupted or unparseable record that causes the consumer to throw an unhandled exception; routing it to a Dead Letter Topic isolates the corrupted record so the consumer can proceed with subsequent valid records without getting stuck.",
+        "C": "A command that restarts all Docker containers.",
+        "D": "A message that exceeds 1GB in size."
+      },
+      "correct": ["B"],
+      "diagnostic_hint": "What happens if a JSON deserialization error occurs on offset 10: does the consumer crash repeatedly forever?",
+      "explanation": "A Poison Pill is a record that consistently fails processing (e.g. malformed JSON, schema mismatch). If unhandled, the consumer fails, restarts, re-reads the same offset, and crashes in an infinite loop. The Dead Letter Topic pattern catches the deserialization exception, publishes the offending payload to `retail.orders.dlt` with error headers, and advances the offset.",
+      "option_explanations": {
+        "A": "Hardware fiction distractor.",
+        "B": "Correct! DLT pattern isolates corrupted events, preventing consumer group head-of-line blocking.",
+        "C": "False: Completely unrelated to container operations.",
+        "D": "False: Oversized payloads are rejected by broker `max.message.bytes` before ingestion."
+      }
+    },
+    {
+      "id": 5,
+      "type": "multiple",
+      "question": "Which configurations govern consumer liveness and determine when a consumer is declared DEAD by the coordinator? (Select ALL that apply)",
+      "options": {
+        "A": "`heartbeat.interval.ms` (frequency of background heartbeats to the coordinator, default 3s)",
+        "B": "`session.timeout.ms` (maximum duration without a heartbeat before member is evicted, default 45s)",
+        "C": "`max.poll.interval.ms` (maximum time between `poll()` calls before consumer is evicted for hung processing, default 5 mins)",
+        "D": "`compression.type`"
+      },
+      "correct": ["A", "B", "C"],
+      "diagnostic_hint": "Which timers monitor thread liveness (heartbeat thread) and application processing liveness (poll loop)?",
+      "explanation": "Consumer failure detection has two independent layers: (A/B) Heartbeat thread monitors network/process liveness (`session.timeout.ms`). (C) Main application thread monitors processing liveness via `max.poll.interval.ms`. If batch processing takes longer than `max.poll.interval.ms`, the consumer is considered hung and evicted.",
+      "option_explanations": {
+        "A": "True: Keeps group membership active via lightweight background pings.",
+        "B": "True: Triggers rebalance if process dies or network drops.",
+        "C": "True: Prevents deadlocks where a thread hangs indefinitely inside record processing.",
+        "D": "False: Governs compression algorithm, not consumer membership."
+      }
+    },
+    {
+      "id": 6,
+      "type": "single",
+      "question": "What is Consumer Lag, and why is it considered the #1 health metric for event-driven systems?",
+      "options": {
+        "A": "The physical latency of electricity traveling across the motherboard.",
+        "B": "The delta between the Log End Offset (latest produced message) and the Consumer's Current Offset (latest processed message), indicating how far behind the consumer is falling.",
+        "C": "The size of the Java heap garbage collection pause.",
+        "D": "The number of dropped TCP packets."
+      },
+      "correct": ["B"],
+      "diagnostic_hint": "How do you measure whether your consumers are keeping up with incoming traffic?",
+      "explanation": "Consumer Lag = `LogEndOffset - CurrentOffset`. If lag is 0, the consumer is processing in real-time. If lag is growing monotonically, incoming producer throughput exceeds downstream processing capacity, requiring consumer scaling, partition increase, or performance optimization.",
+      "option_explanations": {
+        "A": "Physics distractor.",
+        "B": "Correct! Lag is the universal metric indicating downstream processing bottlenecks.",
+        "C": "JVM metric, not consumer-offset delta.",
+        "D": "Network infrastructure metric."
+      }
+    },
+    {
+      "id": 7,
+      "type": "single",
+      "question": "What is the difference between `auto.offset.reset = 'earliest'` and `auto.offset.reset = 'latest'`?",
+      "options": {
+        "A": "'earliest' deletes messages, whereas 'latest' compresses them.",
+        "B": "When a consumer group has NO committed offset (or the offset has expired), 'earliest' reads from the beginning of the partition (offset 0), while 'latest' starts reading only new events produced after the consumer started.",
+        "C": "'earliest' only works with Python; 'latest' only works with Java.",
+        "D": "There is no difference; both start at offset 0."
+      },
+      "correct": ["B"],
+      "diagnostic_hint": "When a brand new consumer group starts for the very first time, where does it start reading?",
+      "explanation": "`auto.offset.reset` is triggered ONLY when no valid committed offset exists for the group. `earliest` rewinds to the oldest available event on disk. `latest` skips all historical data and waits for future events.",
+      "option_explanations": {
+        "A": "False: Neither option deletes or compresses records.",
+        "B": "Correct! Defines initial offset positioning policy for new consumer groups.",
+        "C": "False: Language-agnostic Kafka client protocol configuration.",
+        "D": "False: Fundamentally opposite behaviors."
+      }
+    },
+    {
+      "id": 8,
+      "type": "multiple",
+      "question": "Which of the following operations can be inspected using the `kafka-consumer-groups.sh` CLI utility? (Select ALL that apply)",
+      "options": {
+        "A": "Listing all active consumer groups in the cluster (`--list`)",
+        "B": "Describing group state, member assignments, partition offsets, and LAG (`--describe --group`)",
+        "C": "Resetting consumer group offsets to earliest, latest, or specific timestamps (`--reset-offsets`)",
+        "D": "Formatting hard drives on broker machines"
+      },
+      "correct": ["A", "B", "C"],
+      "diagnostic_hint": "Which CLI commands did you use to audit consumer lag and reset offsets?",
+      "explanation": "`kafka-consumer-groups.sh` is the administrative tool for: (A) `--list` to discover groups, (B) `--describe` to inspect per-partition current offset, log-end offset, and lag, and (C) `--reset-offsets` to rewind or fast-forward group positions.",
+      "option_explanations": {
+        "A": "True: Core administrative discovery flag.",
+        "B": "True: The definitive tool for auditing consumer lag in production.",
+        "C": "True: Essential for disaster recovery and message replayability.",
+        "D": "Completely false; administrative scripts do not format disks."
+      }
+    },
+    {
+      "id": 9,
+      "type": "single",
+      "question": "In a production consumer group, consumers repeatedly rebalance every few minutes, throughput drops to zero, and CPU spikes. What is the root cause of this 'Cascading Rebalance Storm' and how is it resolved?",
+      "options": {
+        "A": "The broker hard drive is formatted.",
+        "B": "Record batch processing time exceeds `max.poll.interval.ms` (e.g. slow database writes take 350s when timeout is 300s), causing the coordinator to evict the consumer; resolved by reducing `max.poll.records` or optimizing processing.",
+        "C": "Consumers are using Snappy compression instead of GZIP.",
+        "D": "The topic has too many consumer groups subscribed."
+      },
+      "correct": ["B"],
+      "diagnostic_hint": "Look at Scenario 1 in your handbook: what happens if the application thread takes too long between poll() calls?",
+      "explanation": "If downstream processing of a batch fetched by `poll()` takes longer than `max.poll.interval.ms` (default 5 minutes), the Group Coordinator concludes the consumer thread is dead/stalled and evicts it. Its partitions are reassigned to another consumer, which also times out on the heavy batch, triggering an endless cascading rebalance storm. Remediation: reduce `max.poll.records` (e.g. to 50 or 100) or optimize processing time.",
+      "option_explanations": {
+        "A": "Nonsense distractor; broker storage is unaffected.",
+        "B": "Correct! This is the classic production rebalance storm caused by poll timeout expiration.",
+        "C": "False: Message compression does not trigger consumer coordinator evictions.",
+        "D": "False: Multiple consumer groups operate completely independently without interfering with each other's rebalances."
+      }
+    },
+    {
+      "id": 10,
+      "type": "multiple",
+      "question": "When designing high-throughput consumers, which best practices optimize processing throughput without triggering unwanted rebalances? (Select ALL that apply)",
+      "options": {
+        "A": "Tune `max.poll.records` to a manageable batch size so processing never exceeds `max.poll.interval.ms`.",
+        "B": "Offload heavy processing (e.g. database writes, ML inferences) to a worker thread pool, keeping the consumer poll loop responsive.",
+        "C": "Increase `session.timeout.ms` to 24 hours.",
+        "D": "Commit offsets synchronously after each individual message (`commitSync()` inside the loop for every record)."
+      },
+      "correct": ["A", "B"],
+      "diagnostic_hint": "What prevents `max.poll.interval.ms` timeouts, and why is committing per message a severe performance bottleneck?",
+      "explanation": "(A) Sizing `max.poll.records` ensures predictable loop execution times. (B) Worker thread pools decouple Kafka polling from slow external I/O. (C) Setting 24 hours delays failure detection by a day! (D) Committing synchronously per message is an anti-pattern that destroys throughput by forcing a network round-trip for every single event.",
+      "option_explanations": {
+        "A": "Best Practice: Prevents `CommitFailedException` and premature eviction.",
+        "B": "Best Practice: Prevents blocking the poll thread on downstream service latencies.",
+        "C": "Anti-pattern: Extremely high session timeout cripples failure recovery.",
+        "D": "Anti-pattern: Per-record sync commit degrades throughput by orders of magnitude."
+      }
+    }
+  ]
+}

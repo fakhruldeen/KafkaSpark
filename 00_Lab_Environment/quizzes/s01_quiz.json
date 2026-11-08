@@ -1,0 +1,207 @@
+{
+  "session": "s01",
+  "title": "S01 Knowledge Gate: Kafka Foundations & Architecture",
+  "description": "Pre-Lab Conceptual Readiness Check for Apache Kafka Core, Event Streaming, and Nile Retail Architecture.",
+  "questions": [
+    {
+      "id": 1,
+      "type": "single",
+      "question": "What are the four fundamental components that constitute an immutable Apache Kafka Event?",
+      "options": {
+        "A": "Table Name, Column Type, Primary Key, and Foreign Key",
+        "B": "Timestamp, Headers (metadata key-values), Key, and Value (payload)",
+        "C": "Server ID, Network Interface Speed, RAM Size, and Programming Language",
+        "D": "Database Schema, SQL Statement, Transaction ID, and Isolation Level"
+      },
+      "correct": ["B"],
+      "diagnostic_hint": "Think about what an event record physically contains when serialized over the wire in Kafka.",
+      "explanation": "An Apache Kafka Event is an immutable record consisting strictly of: (1) Timestamp (event creation/log append time), (2) Headers (optional metadata key-value pairs for tracing/routing), (3) Key (used for partition hashing and compaction), and (4) Value (the actual payload/body serialized as bytes).",
+      "option_explanations": {
+        "A": "Relational database concepts (Tables, Columns, Foreign Keys). Kafka operates on streams of events, not tabular schema-bound SQL tables.",
+        "B": "Correct! These are the four core fields in every Kafka ConsumerRecord and ProducerRecord.",
+        "C": "Infrastructure hardware and OS metrics, completely unrelated to event message structure.",
+        "D": "ACID RDBMS transaction metadata, not Kafka event log primitives."
+      }
+    },
+    {
+      "id": 2,
+      "type": "single",
+      "question": "Why is a Kafka Partition defined as the fundamental unit of parallelism and storage in Apache Kafka?",
+      "options": {
+        "A": "Because a single partition can be split across multiple broker nodes to increase disk space.",
+        "B": "Because it runs a dedicated SQLite database inside the broker process.",
+        "C": "Because a single partition must reside entirely on a single broker disk, and cannot be subdivided across servers.",
+        "D": "Because each event inside a partition is encrypted using nuclear-grade quantum cryptography."
+      },
+      "correct": ["C"],
+      "diagnostic_hint": "Consider whether Kafka allows spreading one individual partition directory across two physical servers.",
+      "explanation": "A partition is the fundamental unit of parallelism and storage in Kafka. A single partition resides entirely on one broker node's filesystem (as a folder of segment files). It CANNOT be split or distributed across multiple brokers. To scale out across 10 brokers, a topic must have multiple partitions distributed across those brokers.",
+      "option_explanations": {
+        "A": "Incorrect. A partition cannot be split across multiple brokers. Splitting happens at the topic level by creating multiple partitions.",
+        "B": "Completely false. Kafka uses commit logs on the OS filesystem, never embedded relational databases.",
+        "C": "Correct! Partition atomicity dictates that 1 partition = 1 broker disk folder = 1 ordered append-only sequence.",
+        "D": "A humorous distractor with no technical basis."
+      }
+    },
+    {
+      "id": 3,
+      "type": "multiple",
+      "question": "Which of the following statements are TRUE regarding Kafka's Distributed Commit Log storage model? (Select ALL that apply)",
+      "options": {
+        "A": "Events are strictly append-only; existing messages cannot be modified in-place using SQL UPDATE.",
+        "B": "Sequential disk writes allow Kafka to achieve multi-gigabyte throughput matching memory bus speeds.",
+        "C": "Offsets are globally unique across all partitions in a Kafka topic.",
+        "D": "Message reading is non-destructive; consuming an event does NOT delete it from the broker disk."
+      },
+      "correct": ["A", "B", "D"],
+      "diagnostic_hint": "Check how offsets work across partitions: is Offset 5 unique across the whole topic, or is it partition-specific?",
+      "explanation": "In Kafka: (A) The log is strictly append-only (immutable facts). (B) Sequential disk writes avoid rotational/random seek latencies, matching raw disk speeds. (D) Reads are non-destructive, meaning consumers merely move an offset pointer without deleting data. Statement (C) is FALSE because Offsets are strictly local to a single partition; Partition 0, Partition 1, and Partition 2 each have their own Offset 0, 1, 2...",
+      "option_explanations": {
+        "A": "True: Immutability guarantees zero lock contention and predictable append semantics.",
+        "B": "True: Sequential I/O turns hard drives and SSDs into continuous throughput pipelines.",
+        "C": "False: Offsets are NOT global. An event's unique coordinate is the composite tuple: (Topic, Partition, Offset).",
+        "D": "True: Multiple consumer groups can read the exact same events independently without mutual interference."
+      }
+    },
+    {
+      "id": 4,
+      "type": "single",
+      "question": "How does Kafka's Zero-Copy data transfer mechanism achieve ultra-low CPU utilization during consumer reads?",
+      "options": {
+        "A": "By compressing all events into 0 bits before transmission.",
+        "B": "By using the Linux `sendfile()` kernel system call to transfer OS Page Cache pages directly to the network socket via DMA, bypassing JVM heap entirely.",
+        "C": "By running Kafka brokers entirely inside the client web browser via WebAssembly.",
+        "D": "By deleting the payload immediately after writing to avoid copying it to disk."
+      },
+      "correct": ["B"],
+      "diagnostic_hint": "Focus on how the OS kernel transfers bytes between disk cache and network card without user-space buffer copies.",
+      "explanation": "In standard socket transfers, data is copied 4 times (Disk -> Kernel Page Cache -> JVM Heap Buffer -> Socket Buffer -> NIC Buffer) with multiple CPU context switches. Kafka's Zero-Copy uses `sendfile()` allowing the OS kernel and Direct Memory Access (DMA) to copy bytes directly from Page Cache to the Network Card without polluting JVM memory or consuming CPU cycles.",
+      "option_explanations": {
+        "A": "Physically impossible; data compression cannot reduce arbitrary bytes to zero.",
+        "B": "Correct! `sendfile()` and DMA bypass the JVM heap, eliminating garbage collection pauses and CPU data-copy overhead.",
+        "C": "Nonsense distractor; Kafka brokers run on server JVMs, not client web browsers.",
+        "D": "Kafka guarantees durability; deleting payloads would cause total data loss."
+      }
+    },
+    {
+      "id": 5,
+      "type": "multiple",
+      "question": "Regarding Partition Key Hashing and Message Ordering, which of the following statements are CORRECT? (Select ALL that apply)",
+      "options": {
+        "A": "All events with the exact same non-null key are guaranteed to land on the exact same partition (assuming partition count is static).",
+        "B": "Kafka guarantees strict global chronological ordering across ALL partitions in a topic.",
+        "C": "Messages produced with a null key are distributed evenly across partitions (Sticky / Round-Robin partitioning).",
+        "D": "Strict event ordering is guaranteed ONLY within the boundary of a single partition."
+      },
+      "correct": ["A", "C", "D"],
+      "diagnostic_hint": "Recall the Golden Rule of Kafka ordering: is it global across the whole topic, or localized?",
+      "explanation": "Kafka's ordering contract guarantees ordering ONLY within an individual partition (D). Hashing (`murmur2(key) % numPartitions`) ensures identical keys land in the same partition in sequential order (A). Null-key records are distributed evenly across partitions (C). Statement (B) is fundamentally FALSE: Kafka does NOT guarantee global ordering across different partitions.",
+      "option_explanations": {
+        "A": "True: Consistent hashing routes identical keys to the same partition, preserving causal ordering for that entity.",
+        "B": "False: Kafka is a distributed partition log. There is NO global ordering across different partitions.",
+        "C": "True: The default partitioner batches null-key events and distributes them across partitions to balance broker load.",
+        "D": "True: This is the core architectural tenet of Kafka: 'Ordering is per-partition'."
+      }
+    },
+    {
+      "id": 6,
+      "type": "single",
+      "question": "What is the primary architectural difference between Apache Kafka and traditional message brokers like RabbitMQ or ActiveMQ when a consumer reads a message?",
+      "options": {
+        "A": "RabbitMQ supports streaming video, whereas Kafka only supports plain text.",
+        "B": "RabbitMQ removes the message from the queue upon successful consumer acknowledgement (destructive read), whereas Kafka retains the message according to retention policies regardless of consumer reads (non-destructive read).",
+        "C": "Kafka requires a GPU cluster to run, while RabbitMQ runs on CPU.",
+        "D": "Traditional brokers are faster because they never write messages to disk."
+      },
+      "correct": ["B"],
+      "diagnostic_hint": "Think about what happens to an event after Consumer A finishes reading it: can Consumer B still read it 2 hours later?",
+      "explanation": "Traditional message queues treat messages as transient tasks; once a consumer acknowledges a message, it is deleted from the broker. Kafka treats messages as an immutable commit log; reading is non-destructive. Messages remain stored until their retention time or size threshold expires, allowing replayability and multiple independent consumer groups.",
+      "option_explanations": {
+        "A": "Irrelevant; both systems carry arbitrary byte arrays regardless of data format.",
+        "B": "Correct! Non-destructive reading is the foundational difference that makes Kafka an event store and stream platform rather than a transient job queue.",
+        "C": "Completely false; Kafka is a standard Java/Scala application running on commodity CPU servers.",
+        "D": "Incorrect; persistent queues in traditional brokers do write to disk, but suffer random I/O bottlenecks."
+      }
+    },
+    {
+      "id": 7,
+      "type": "multiple",
+      "question": "When creating a new topic via `kafka-topics.sh`, which CLI arguments are MANDATORY or standard required options? (Select ALL that apply)",
+      "options": {
+        "A": "`--bootstrap-server` (specifying target Kafka broker connection string)",
+        "B": "`--topic` (specifying the unique name of the topic)",
+        "C": "`--partitions` (specifying number of parallel log units)",
+        "D": "`--sql-schema` (specifying the relational CREATE TABLE DDL syntax)"
+      },
+      "correct": ["A", "B", "C"],
+      "diagnostic_hint": "Which command flags did you execute when running the topic creation command in Kafka CLI?",
+      "explanation": "Creating a topic via `kafka-topics.sh` requires: `--bootstrap-server` (where to connect), `--topic` (topic name), `--partitions` (number of partitions), and typically `--replication-factor` (number of replicas). Statement (D) is completely invalid as Kafka topics do not take SQL DDL schemas during creation.",
+      "option_explanations": {
+        "A": "Required: The client must know at least one broker in the cluster to initiate the metadata handshake.",
+        "B": "Required: The cluster needs to know the identifier of the topic being created.",
+        "C": "Required/Standard: Defines the throughput ceiling and degree of parallelism for the topic.",
+        "D": "Invalid: Kafka topics are byte streams; schemas are managed externally via Schema Registry or applications, not CLI SQL statements."
+      }
+    },
+    {
+      "id": 8,
+      "type": "single",
+      "question": "In the Nile Retail architecture, you have 10 fulfillment packing workers in a single consumer group, and order throughput reaches 10,000 orders/sec. What is the MINIMUM number of partitions the `retail.orders` topic must have so that all 10 workers can process events in parallel?",
+      "options": {
+        "A": "1 partition (Kafka dynamically multi-threads a partition across 10 workers)",
+        "B": "3 partitions (workers will automatically share partitions in round-robin)",
+        "C": "At least 10 partitions (since a single partition can only be read by at most one consumer instance within the same group)",
+        "D": "Exactly 100 partitions minimum, otherwise the cluster crashes"
+      },
+      "correct": ["C"],
+      "diagnostic_hint": "Remember the fundamental consumer group rule: can two consumers in the same group read from the same partition simultaneously?",
+      "explanation": "The maximum degree of active consumer parallelism in a Consumer Group equals the number of partitions in the subscribed topic. A single partition can NEVER be assigned to more than one consumer instance in the same group (to prevent concurrency race conditions). If a topic has 3 partitions and you have 10 consumers, 7 consumers will sit 100% IDLE. Therefore, to utilize all 10 workers, you must have at least 10 partitions.",
+      "option_explanations": {
+        "A": "False: A partition cannot be consumed in parallel by multiple members of the same group.",
+        "B": "False: With 3 partitions, only 3 consumers will get partitions; the remaining 7 workers will receive zero events.",
+        "C": "Correct! Partitions >= Active Consumers is mandatory for full worker saturation.",
+        "D": "False: 10 partitions is sufficient for 10 workers; 100 is not a technical minimum requirement."
+      }
+    },
+    {
+      "id": 9,
+      "type": "single",
+      "question": "What mechanism triggers the deletion of old events from a Kafka broker's disk?",
+      "options": {
+        "A": "A consumer sending a commit offset acknowledgment back to the broker.",
+        "B": "Topic retention policies based on time (`log.retention.hours/ms`) or size (`log.retention.bytes`) expiring completed segments.",
+        "C": "The broker restarting or undergoing a scheduled daily reboot.",
+        "D": "The producer closing its network connection socket."
+      },
+      "correct": ["B"],
+      "diagnostic_hint": "Does Kafka delete data when you read it, or does it clean up based on configured time/size retention policies?",
+      "explanation": "Kafka never deletes data when consumers read or commit offsets. Log segments are cleaned up independently by background Log Cleaner threads based on configured retention policies: either elapsed time (`log.retention.hours/ms`, default 7 days) or total accumulated size (`log.retention.bytes`), or via compaction for keyed topics.",
+      "option_explanations": {
+        "A": "False: Committing an offset simply records the consumer's position in `__consumer_offsets`; it does NOT delete the event.",
+        "B": "Correct! Retention policies dictate log segment lifecycle independently of consumer activity.",
+        "C": "False: Kafka is a persistent durable store; data persists across broker reboots.",
+        "D": "False: Producer connections have zero impact on stored log segments."
+      }
+    },
+    {
+      "id": 10,
+      "type": "multiple",
+      "question": "Which of the following represent serious ARCHITECTURAL ANTI-PATTERNS or dangerous misconceptions when designing Kafka topics? (Select ALL that apply)",
+      "options": {
+        "A": "Creating a topic with 1 single partition for a multi-terabyte, high-throughput enterprise event stream.",
+        "B": "Increasing partition count on an active keyed topic without realizing that key-to-partition hash mappings will change for new messages.",
+        "C": "Setting replication factor to 3 on a 3-broker production cluster to achieve high availability.",
+        "D": "Assuming that Kafka replaces full-text search engines like Elasticsearch by providing arbitrary ad-hoc SQL filtering over petabytes of cold logs without consumer scanning."
+      },
+      "correct": ["A", "B", "D"],
+      "diagnostic_hint": "Identify which practices lead to severe bottlenecks, broken ordering for keyed events, or unrealistic expectations.",
+      "explanation": "(A) 1 partition bottlenecks an entire topic to 1 broker disk and 1 consumer thread. (B) Changing partition count alters `murmur2(key) % N`, causing subsequent events for the same key to land in different partitions, violating ordering! (D) Kafka is an append-only sequential log, not a secondary-index search engine. In contrast, (C) is a production BEST PRACTICE (Replication Factor 3 on 3 brokers ensures tolerance against 1 broker failure).",
+      "option_explanations": {
+        "A": "Anti-pattern: Single partition eliminates distributed throughput and prevents consumer scaling.",
+        "B": "Anti-pattern/Danger: Changing partition count shuffles hash routing, breaking causal ordering for existing keys.",
+        "C": "Best Practice: RF 3 is the industry standard for production Kafka reliability; this is NOT an anti-pattern.",
+        "D": "Misconception/Anti-pattern: Kafka lacks arbitrary inverted indexes; searching historical events requires full partition scanning unless paired with a query engine or search index."
+      }
+    }
+  ]
+}

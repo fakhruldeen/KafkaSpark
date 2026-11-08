@@ -1,0 +1,207 @@
+{
+  "session": "s02",
+  "title": "S02 Knowledge Gate: Topics, Partitions, Replication & Storage",
+  "description": "Pre-Lab Conceptual Readiness Check for KRaft, Replication Factor, ISR, Segment Files, and Zero Data Loss guarantees.",
+  "questions": [
+    {
+      "id": 1,
+      "type": "single",
+      "question": "What is the primary role of the In-Sync Replicas (ISR) list in Apache Kafka?",
+      "options": {
+        "A": "It lists all client applications currently subscribed to the topic.",
+        "B": "It is the dynamic set of follower replicas that have fully caught up with the partition leader up to the High Watermark (within `replica.lag.time.max.ms`).",
+        "C": "It is an internal cache storing compressed JSON messages before disk flushing.",
+        "D": "It stores user authentication passwords in the KRaft metadata log."
+      },
+      "correct": ["B"],
+      "diagnostic_hint": "Focus on high availability and fault tolerance: which replicas are eligible to be elected as the new leader if the current leader crashes?",
+      "explanation": "The ISR is the active subset of partition replicas that are actively in-sync with the leader. If a follower falls behind for longer than `replica.lag.time.max.ms` (default 30s), it is evicted from the ISR. Only ISR members are eligible for election as a new partition leader during clean failover.",
+      "option_explanations": {
+        "A": "Incorrect. Client subscriptions are managed by Consumer Groups, completely separate from broker replication.",
+        "B": "Correct! ISR is the dynamic pool of fully synchronized replicas maintaining zero-lag copies of partition data.",
+        "C": "Incorrect. Message compression occurs in client Producer RecordAccumulators or broker log appenders.",
+        "D": "Incorrect. User authentication credentials reside in JAAS or SCRAM configs, not the ISR list."
+      }
+    },
+    {
+      "id": 2,
+      "type": "single",
+      "question": "A topic is configured with `replication.factor = 3` and `min.insync.replicas = 2`. A producer sends records with `acks = all`. What happens if 2 out of the 3 brokers suddenly crash?",
+      "options": {
+        "A": "The producer continues writing successfully because 1 broker is still alive.",
+        "B": "The producer receives a `NotEnoughReplicasException` (or `NotEnoughReplicasAfterAppendException`) and writes are blocked to prevent data loss.",
+        "C": "Kafka silently ignores the error and drops the messages.",
+        "D": "Kafka automatically provisions a new cloud server to replace the dead broker."
+      },
+      "correct": ["B"],
+      "diagnostic_hint": "Calculate: Total replicas alive = 1. What was the configured `min.insync.replicas` threshold?",
+      "explanation": "With `acks=all`, Kafka requires acknowledgements from all currently in-sync replicas, and the number of available ISR members must be greater than or equal to `min.insync.replicas`. Since only 1 broker is alive and `min.insync.replicas = 2`, the condition (1 >= 2) fails, and Kafka rejects writes with `NotEnoughReplicasException` to preserve data durability.",
+      "option_explanations": {
+        "A": "False: 1 alive broker is below the `min.insync.replicas = 2` threshold.",
+        "B": "Correct! Kafka chooses consistency over availability (CP in CAP theorem) to guarantee zero data loss.",
+        "C": "False: Kafka never silently drops records under standard producer configurations.",
+        "D": "False: Kafka is broker software, not an automated cloud infrastructure orchestrator."
+      }
+    },
+    {
+      "id": 3,
+      "type": "multiple",
+      "question": "Which of the following physical files are generated on disk for each Kafka log segment? (Select ALL that apply)",
+      "options": {
+        "A": "`.log` file (containing raw sequential message batches and payload bytes)",
+        "B": "`.index` file (mapping logical offsets to physical byte offsets in the `.log` file)",
+        "C": "`.timeindex` file (mapping event timestamps to logical offsets for time-based lookups)",
+        "D": "`.sql` file (storing SQL CREATE TABLE scripts and indexes)"
+      },
+      "correct": ["A", "B", "C"],
+      "diagnostic_hint": "Think about the files you inspect inside `/var/lib/kafka/data/<topic>-<partition>/`.",
+      "explanation": "Each segment consists of: (A) `.log` storing sequential binary record batches, (B) `.index` containing sparse offset-to-physical-byte pointers for fast binary search, and (C) `.timeindex` mapping millisecond timestamps to offsets. (D) is completely invalid as Kafka does not use SQL files.",
+      "option_explanations": {
+        "A": "True: Holds the raw event stream serialized as RecordBatches.",
+        "B": "True: Allows O(1) jump into byte positions without scanning the entire file.",
+        "C": "True: Powers timestamp search operations (e.g., `consumer.offsetsForTimes()`).",
+        "D": "False: Kafka is a distributed event log, not an RDBMS."
+      }
+    },
+    {
+      "id": 4,
+      "type": "single",
+      "question": "What is the primary architectural advance of KRaft (Kafka Raft Metadata Mode, KIP-500) over legacy ZooKeeper-based clusters?",
+      "options": {
+        "A": "KRaft replaces hard drives with quantum memory.",
+        "B": "KRaft eliminates external ZooKeeper dependencies by managing cluster metadata directly inside Kafka brokers using an internal quorum-based Raft event log (`@metadata`).",
+        "C": "KRaft allows consumers to execute full outer joins without Spark.",
+        "D": "KRaft limits the cluster to a maximum of 1 broker."
+      },
+      "correct": ["B"],
+      "diagnostic_hint": "Why did Kafka eliminate ZooKeeper? How is cluster consensus managed now?",
+      "explanation": "KRaft removes ZooKeeper by turning Kafka metadata into an internal event log (`@metadata`). Controller nodes use the Raft consensus protocol to replicate metadata in-memory, scaling partition capacity up to millions and reducing controller failover time from minutes to milliseconds.",
+      "option_explanations": {
+        "A": "Science fiction distractor.",
+        "B": "Correct! KRaft unifies metadata and data planes using native Raft consensus.",
+        "C": "Unrelated; stream joins belong to Kafka Streams / Spark / ksqlDB, not cluster consensus.",
+        "D": "False: KRaft scales clusters to hundreds of brokers and millions of partitions."
+      }
+    },
+    {
+      "id": 5,
+      "type": "multiple",
+      "question": "What happens when a Kafka log segment reaches its `segment.bytes` size limit (default 1GB) or `segment.ms` age limit? (Select ALL that apply)",
+      "options": {
+        "A": "The active segment is closed (rolled) and marked read-only.",
+        "B": "A brand new active `.log`, `.index`, and `.timeindex` segment file is created for subsequent writes.",
+        "C": "The closed segment becomes eligible for retention deletion or log compaction.",
+        "D": "Kafka deletes all consumer groups subscribed to that topic."
+      },
+      "correct": ["A", "B", "C"],
+      "diagnostic_hint": "Consider log segment rolling mechanics and which segments can be deleted.",
+      "explanation": "When the active segment reaches `segment.bytes` or `segment.ms`: (A) It is rolled and closed to writes. (B) A new active segment is opened starting at the next offset. (C) Closed segments can now be evaluated by retention cleaners for deletion or compaction. (D) is completely absurd; consumer groups are never deleted when segments roll.",
+      "option_explanations": {
+        "A": "True: Active segments cannot be compacted or deleted; they must be rolled first.",
+        "B": "True: New incoming records are appended exclusively to the new active segment.",
+        "C": "True: Only non-active (closed) segments can undergo retention cleanup.",
+        "D": "False: Consumer group offsets remain independent of physical segment boundaries."
+      }
+    },
+    {
+      "id": 6,
+      "type": "single",
+      "question": "What is the function of the High Watermark (HW) offset in a Kafka partition?",
+      "options": {
+        "A": "The highest offset that has been replicated to all In-Sync Replicas (ISR); consumers can only read up to this offset.",
+        "B": "The maximum temperature allowed on broker CPU heat sinks.",
+        "C": "The physical offset on disk where corrupted records begin.",
+        "D": "The maximum number of consumer threads permitted per partition."
+      },
+      "correct": ["A"],
+      "diagnostic_hint": "Why can consumers not read records that the leader wrote but followers have not yet replicated?",
+      "explanation": "The High Watermark (HW) is the highest offset committed and replicated across all ISR members. Kafka prevents consumers from reading beyond the HW to ensure that uncommitted messages (which might be lost if the leader dies before replicating) are never seen by downstream clients.",
+      "option_explanations": {
+        "A": "Correct! HW defines the safe read boundary for consumers, guaranteeing read isolation.",
+        "B": "Nonsense hardware distractor.",
+        "C": "Incorrect; data integrity is validated via CRC checksums in record headers, not HW.",
+        "D": "Incorrect; consumer concurrency is governed by partition count."
+      }
+    },
+    {
+      "id": 7,
+      "type": "multiple",
+      "question": "Which Kafka CLI tool can be used to inspect the internal binary contents of `.log` and `.index` segment files? (Select the correct tool and valid options)",
+      "options": {
+        "A": "`kafka-dump-log.sh` with `--files` and `--print-data-log`",
+        "B": "`kafka-run-class.sh kafka.tools.DumpLogSegments`",
+        "C": "`cat` or `notepad.exe` directly on the binary `.log` file",
+        "D": "`kafka-delete-records.sh`"
+      },
+      "correct": ["A", "B"],
+      "diagnostic_hint": "Which tool dumps record batch headers, offsets, payloads, and index entries in human-readable format?",
+      "explanation": "`kafka-dump-log.sh` (which invokes `kafka.tools.DumpLogSegments` under the hood) parses binary Kafka segment files and prints offsets, timestamps, payload byte sizes, compression codecs, and CRC checks in structured text.",
+      "option_explanations": {
+        "A": "Correct: Standard Kafka administrative script for physical segment inspection.",
+        "B": "Correct: The underlying Java class executed by `kafka-dump-log.sh`.",
+        "C": "Incorrect: Segment files are binary; opening in text editors corrupts or displays unreadable control characters.",
+        "D": "Incorrect: `kafka-delete-records.sh` is used to truncate log prefixes, not inspect file internals."
+      }
+    },
+    {
+      "id": 8,
+      "type": "single",
+      "question": "What setting controls whether Kafka allows an out-of-sync follower replica to become partition leader if all ISR replicas crash?",
+      "options": {
+        "A": "`unclean.leader.election.enable` (default `false` in modern Kafka)",
+        "B": "`auto.leader.rebalance.enable`",
+        "C": "`compression.type`",
+        "D": "`ssl.endpoint.identification.algorithm`"
+      },
+      "correct": ["A"],
+      "diagnostic_hint": "Focus on 'clean' vs 'unclean' leader election when availability vs durability trade-offs occur.",
+      "explanation": "`unclean.leader.election.enable=false` guarantees that only synchronized ISR replicas can become leader, preventing data loss even if the partition becomes unavailable. Setting it to `true` prioritizes availability over consistency, risking major data truncation/loss.",
+      "option_explanations": {
+        "A": "Correct! Setting this to false is the #1 rule for financial and mission-critical zero-loss architectures.",
+        "B": "Incorrect: Manages periodic rebalancing of preferred leader replicas, not out-of-sync elections.",
+        "C": "Incorrect: Configures message compression codec (snappy, lz4, gzip, zstd).",
+        "D": "Incorrect: TLS certificate hostname verification parameter."
+      }
+    },
+    {
+      "id": 9,
+      "type": "single",
+      "question": "What does Log Compaction (`cleanup.policy = compact`) guarantee in Apache Kafka?",
+      "options": {
+        "A": "It compresses all messages using GZIP compression.",
+        "B": "It retains at least the latest value for each message key within a partition, pruning older superseded values during background cleaning.",
+        "C": "It permanently deletes all messages with non-null keys.",
+        "D": "It encrypts all message values using AES-256."
+      },
+      "correct": ["B"],
+      "diagnostic_hint": "Think of a database changelog or table snapshot: what is retained when multiple updates occur for customer 101?",
+      "explanation": "Log Compaction retains the most recent record for each key. It creates a compacted changelog (like an RDBMS table state), removing obsolete updates while preserving the latest snapshot. A null value (tombstone) deletes the key permanently.",
+      "option_explanations": {
+        "A": "False: Compaction is a retention policy, not wire/disk compression.",
+        "B": "Correct! Guarantees that downstream consumers replaying from offset 0 will restore the latest state for every key.",
+        "C": "False: Compaction retains the latest value; it does not delete non-null keys.",
+        "D": "False: Encryption is handled by client serializers or filesystem/disk encryption."
+      }
+    },
+    {
+      "id": 10,
+      "type": "multiple",
+      "question": "Which of the following actions can be performed dynamically on a live topic using `kafka-configs.sh` without restarting brokers? (Select ALL that apply)",
+      "options": {
+        "A": "Altering `min.insync.replicas`",
+        "B": "Modifying `retention.ms` or `retention.bytes`",
+        "C": "Decreasing the number of partitions from 4 to 2",
+        "D": "Changing `max.message.bytes`"
+      },
+      "correct": ["A", "B", "D"],
+      "diagnostic_hint": "Can you reduce partitions in Kafka? Which parameters can be altered dynamically?",
+      "explanation": "`kafka-configs.sh --alter --entity-type topics` allows dynamic modification of `min.insync.replicas`, `retention.ms`, `retention.bytes`, `max.message.bytes`, and cleanup policies. However, option (C) is IMPOSSIBLE: Kafka strictly forbids reducing partition count because doing so would violate partition ordering and drop physical segment files.",
+      "option_explanations": {
+        "A": "True: Dynamically adjustable per topic.",
+        "B": "True: Dynamically adjustable to tune retention on the fly.",
+        "C": "False: Kafka NEVER allows decreasing partition count under any circumstances.",
+        "D": "True: Dynamically adjustable to permit larger payloads for specific topics."
+      }
+    }
+  ]
+}

@@ -5,3 +5,6 @@ data/s*_*.txt
 __pycache__/
 .pytest_cache/
 *.pyc
+
+.quiz_states/
+
