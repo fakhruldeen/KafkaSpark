@@ -74,7 +74,9 @@ docker compose up -d
 ---
 
 ### [Day 2: High-Throughput Production, Reliable Consumption & Schemas](02_Day_2_Producers_Consumers_Contracts/README.md)
-* **[S03: Producer Internals & Delivery Semantics](02_Day_2_Producers_Consumers_Contracts/S03_Producer_Internals_Delivery_Semantics/README.md)**: RecordAccumulator memory management, BufferPool allocation, acks quorums, and idempotent producer sequence deduplication.
+*Structure: 30% Architectural Lectures \| 20% Instructor Live Demos \| 50% Trainee Hands-On Machine Practice*
+* **[S02: Topics, Partitions & Replication (Remediation & Labs)](02_Day_2_Producers_Consumers_Contracts/S02_Topics_Partitions_Replication/README.md)**: MurmurHash2 key routing proof, physical log segment dumps, ISR quorum tracking, and chaos broker failover drills.
+* **[S03: Producer Internals & Delivery Semantics](02_Day_2_Producers_Consumers_Contracts/S03_Producer_Internals_Delivery_Semantics/README.md)**: RecordAccumulator memory management, BufferPool allocation, acks quorums, Snappy compression, and idempotent producer sequence deduplication.
 * **[S04: Consumer Groups, Rebalancing & Reliability](02_Day_2_Producers_Consumers_Contracts/S04_Consumer_Internals_Rebalance_Reliability/README.md)**: Consumer offset commits, Eager vs. CooperativeSticky incremental rebalance, and Dead Letter Topics (DLT).
 * **[S05: Confluent Schema Registry & Data Contracts](02_Day_2_Producers_Consumers_Contracts/S05_Confluent_Schema_Registry_Data_Contracts/README.md)**: Apache Avro wire format (Magic Byte + 4-byte Schema ID), compatibility rules (BACKWARD, FORWARD, FULL), and data contracts.
 
