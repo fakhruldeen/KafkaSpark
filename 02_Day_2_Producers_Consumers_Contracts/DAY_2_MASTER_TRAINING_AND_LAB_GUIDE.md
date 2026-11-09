@@ -10,12 +10,17 @@
 
 ## 🎯 Pedagogical Delivery Architecture: The 30 / 20 / 50 Formula
 
-To ensure trainees gain both architectural clarity and deep muscle memory, Day 2 follows a strict **30% Lecture / 20% Demonstration / 50% Hands-On Trainee Practice** structure:
+To ensure trainees gain both architectural clarity and deep muscle memory, Day 2 begins with a rapid **15-minute diagnostic kick-off**, followed by our structured **30% Lecture / 20% Demonstration / 50% Hands-On Trainee Practice** model:
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
+│ 09:00 – 09:15 (15 Min) KICK-OFF REVISION & READINESS GATE                    │
+│ • Whiteboard visual recap (Topic, Partition, ISR, Leader/Follower)          │
+│ • 3 Diagnostic Killer Questions (Groups, Quorums, MurmurHash2 Ordering)     │
+│ • 2-minute student workstation health verification (check_stack.sh)         │
+├─────────────────────────────────────────────────────────────────────────────┤
 │ 30% CONCEPTUAL LECTURES (90 Min)                                            │
-│ • S02 Bridge: Physical Partitions, MurmurHash2 & ISR Durability (30m)        │
+│ • S02 Bridge: Physical Partitions, Segments, ISR & Storage Internals (30m)  │
 │ • S03 Internals: Dual-Threading, RecordAccumulator & Idempotence (30m)      │
 │ • S04 Internals: Consumer Groups, Cooperative Rebalance & DLT (30m)         │
 ├─────────────────────────────────────────────────────────────────────────────┤
@@ -39,17 +44,32 @@ To ensure trainees gain both architectural clarity and deep muscle memory, Day 2
 
 | Time Slot | Allocation | Focus & Activity | Deliverable / Command |
 |---|:---:|---|---|
-| **09:00 – 09:30** | **30% Lecture** | **S02 Remediation:** Partitions, MurmurHash2 routing, and In-Sync Replicas (ISR) | Whiteboard & Slides S02 |
-| **09:30 – 10:00** | **30% Lecture** | **S03 Deep Dive:** Producer dual-threaded engine, `RecordAccumulator`, and Idempotence | Slides S03 |
-| **10:00 – 10:30** | **30% Lecture** | **S04 Deep Dive:** Consumer groups, Cooperative Sticky rebalance, and DLT pattern | Slides S04 |
-| **10:30 – 10:50** | **20% Demo** | **Instructor Demo 1:** `kafka-topics`, MurmurHash2 verification, and binary `kafka-dump-log.sh` | Terminal (Projector) |
-| **10:50 – 11:10** | **20% Demo** | **Instructor Demo 2:** Python Producer execution, batching vs latency tuning (`linger.ms`) | `python/s03_producer.py` |
-| **11:10 – 11:30** | **20% Demo** | **Instructor Demo 3:** Multi-terminal rebalance live and poison-pill routing to DLT | `python/s04_consumer.py` |
-| *11:30 – 12:00* | *Break* | *Coffee / Networking Break* | — |
-| **12:00 – 12:35** | **50% Lab** | **Trainee Lab 1 (S02):** Replicated topic creation, key routing proof, chaos broker kill | `./verify_s02.sh` + Quiz |
-| **12:35 – 13:15** | **50% Lab** | **Trainee Lab 2 (S03):** Producer configuration, Snappy compression & Idempotent Pytest | `./verify_s03.sh` + Quiz |
-| **13:15 – 14:00** | **50% Lab** | **Trainee Lab 3 (S04):** Dual-terminal consumer group, crash failover, and DLT routing | `./verify_s04.sh` + Quiz |
-| **14:00 – 14:30** | **50% Lab** | **Trainee Lab 4 (Capstone):** Integrated Black Friday outage simulation drill | End-to-End Cluster Test |
+| **09:00 – 09:15** | **Kick-Off** | **15-Min Morning Revision:** Visual recap, 3 diagnostic questions, and workstation stack check | [`DAY_2_15_MINUTE_MORNING_REVISION.md`](./DAY_2_15_MINUTE_MORNING_REVISION.md) |
+| **09:15 – 09:45** | **30% Lecture** | **S02 Remediation:** Partitions, MurmurHash2 routing, segments, and In-Sync Replicas (ISR) | Whiteboard & Slides S02 |
+| **09:45 – 10:15** | **30% Lecture** | **S03 Deep Dive:** Producer dual-threaded engine, `RecordAccumulator`, and Idempotence | Slides S03 |
+| **10:15 – 10:45** | **30% Lecture** | **S04 Deep Dive:** Consumer groups, Cooperative Sticky rebalance, static membership, and DLT | Slides S04 |
+| **10:45 – 11:05** | **20% Demo** | **Instructor Demo 1:** `kafka-topics`, MurmurHash2 verification, and binary `kafka-dump-log.sh` | Terminal (Projector) |
+| **11:05 – 11:25** | **20% Demo** | **Instructor Demo 2:** Python Producer execution, batching vs latency tuning (`linger.ms`) | `python/s03_producer.py` |
+| **11:25 – 11:45** | **20% Demo** | **Instructor Demo 3:** Multi-terminal rebalance live and poison-pill routing to DLT | `python/s04_consumer.py` |
+| *11:45 – 12:15* | *Break* | *Coffee / Networking Break* | — |
+| **12:15 – 12:50** | **50% Lab** | **Trainee Lab 1 (S02):** Replicated topic creation, key routing proof, chaos broker kill | `./verify_s02.sh` + Quiz |
+| **12:50 – 13:30** | **50% Lab** | **Trainee Lab 2 (S03):** Producer configuration, Snappy compression & Idempotent Pytest | `./verify_s03.sh` + Quiz |
+| **13:30 – 14:10** | **50% Lab** | **Trainee Lab 3 (S04):** Dual-terminal consumer group, crash failover, and DLT routing | `./verify_s04.sh` + Quiz |
+| **14:10 – 14:40** | **50% Lab** | **Trainee Lab 4 (Capstone):** Integrated Black Friday outage simulation drill | End-to-End Cluster Test |
+
+---
+
+# 🌅 Part 0: The 15-Minute Morning Kick-Off (09:00 – 09:15)
+
+> For full spoken cues and diagnostic rationale, refer to [`DAY_2_15_MINUTE_MORNING_REVISION.md`](./DAY_2_15_MINUTE_MORNING_REVISION.md).
+
+1. **Visual Architecture Recap (3 min):** Draw Producer $\rightarrow$ Broker Leaders & Followers (ISR) $\rightarrow$ Consumer Group partitions on whiteboard.
+2. **3 Diagnostic Killer Questions (4 min):**
+   - *Q1 (Consumer Idle):* Why does a 4th consumer sit idle on a 3-partition topic? (1 partition = 1 consumer maximum per group).
+   - *Q2 (Durability Gate):* Why does Kafka reject writes with `NotEnoughReplicasException` when live ISR < `min.insync.replicas`? (Consistency over availability to prevent silent data loss).
+   - *Q3 (Ordering Proof):* Why does `CUSTOMER_101` always arrive in chronological order? (MurmurHash2 strictly binds identical keys to the same partition).
+3. **2-Minute Workstation Health Check (4 min):** All trainees run `cd ~/Desktop/Work/Training/Spark/00_Lab && tools/check_stack.sh`.
+4. **Day 2 Roadmap Transition (4 min):** Set expectations for today's focus on Producers, Consumers, and 50% hands-on terminal practice.
 
 ---
 
@@ -70,6 +90,9 @@ To ensure trainees gain both architectural clarity and deep muscle memory, Day 2
   - **Followers:** Continuously fetch records from the leader to stay synchronized.
   - **ISR (In-Sync Replicas):** The dynamic set of healthy nodes keeping up with the leader.
   - **Durability Gate:** With `acks=all` and `min.insync.replicas=2`, if the active ISR count drops below 2, writes are rejected with `NotEnoughReplicasException`, guaranteeing **zero silent data loss**.
+- **Large Message Handling Strategies (>1 MB):**
+  - Claim-Check pattern: Store blob in object storage (S3/GCS), write reference payload to Kafka.
+  - Micro-batch compression via Snappy or LZ4.
 
 ---
 
@@ -94,6 +117,8 @@ To ensure trainees gain both architectural clarity and deep muscle memory, Day 2
 - **Cooperative Sticky Rebalance Protocol:**
   - **Legacy Eager:** Stopped the world; all consumers surrendered all partitions during any group change.
   - **Cooperative:** Only revoked/reassigned partitions are migrated; healthy workers continue reading their assigned partitions without latency spikes.
+- **Static Membership (`group.instance.id`):**
+  - Prevents rebalances during rolling deployments or restarts if the container returns within `session.timeout.ms`.
 - **Offset Tracking (`__consumer_offsets`):**
   - Kafka records the consumer read position as an offset in an internal compact topic.
   - **At-Least-Once:** Commit offsets manually *after* business logic finishes (`enable.auto.commit=false`).
@@ -309,6 +334,16 @@ python3 quiz.py s04
 
 ---
 
+## 📊 Operations & JMX Monitoring Golden Signals
+
+Before concluding Day 2, emphasize the four Golden Operational Signals:
+- **`OfflinePartitionsCount` (Must be 0):** Partitions with no active leader. Page immediately!
+- **`UnderMinIsrPartitionCount` (Must be 0):** ISR < `min.insync.replicas`. Writes are being refused!
+- **`UnderReplicatedPartitions` (Must be 0):** A follower is lagging or down.
+- **Consumer Lag:** Monitor via `kafka-consumer-groups.sh --describe` or Kafka UI (`localhost:8080`).
+
+---
+
 ## 🛠️ Student Workstation Troubleshooting Reference
 
 | Issue | Root Cause | Immediate Fix |
@@ -317,3 +352,4 @@ python3 quiz.py s04
 | `ModuleNotFoundError: No module named confluent_kafka` | Python venv not active | Use `.venv/bin/python` or execute `source .venv/bin/activate` |
 | `NotEnoughReplicasException` | Live ISR count < `min.insync.replicas` | Run `tools/check_stack.sh` and restart downed brokers (`docker start kafkaX`) |
 | Consumer hangs with no output | Waiting for new records | Add `--from-beginning` flag to read historical log |
+| `ConcurrentModificationException` | Multi-threaded `KafkaConsumer` access | Keep consumer poll/commit on one thread; offload work to thread pools |
